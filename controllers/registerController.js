@@ -52,7 +52,7 @@ exports.registerUser = async (req, res) => {
       socketTimeout: 10000
     });
 
-    // ✅ URL atualizada para produção
+    // URL produção
     const activationLink = `https://teledata-deploy-production.up.railway.app/auth/activate/${activationToken}`;
 
     // Envio de email com tratamento de erro específico
@@ -73,8 +73,6 @@ exports.registerUser = async (req, res) => {
 
     } catch (emailError) {
       console.error("Erro ao enviar email de ativação:", emailError);
-      // Não falha o registro se o email não for enviado, apenas loga o erro
-      // O usuário pode solicitar reenvio do email de ativação depois
     }
 
     return res.status(201).json({
