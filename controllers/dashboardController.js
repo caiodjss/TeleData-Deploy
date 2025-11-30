@@ -4,6 +4,8 @@ const Enrollment = require("../database/models/enrollment");
 const Course = require("../database/models/courses");
 const Activity = require("../database/models/activity");
 
+const {ErrorHandle} = require("../utils/errorhandle")
+
 // Métricas principais - Testado e funcional parcial.
 async function getMetrics(req, res) {
   try {
@@ -19,8 +21,7 @@ async function getMetrics(req, res) {
       totalAdmins, 
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao buscar métricas do dashboard" });
+    ErrorHandle(error);
   }
 }
 
@@ -34,8 +35,7 @@ async function getRecentUsers(req, res) {
     });
     res.json(users);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao buscar usuários recentes" });
+    ErrorHandle(error);
   }
 }
 
@@ -52,8 +52,7 @@ async function getProfilesDistribution(req, res) {
       { type: "admin", count: admins }
     ]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao buscar distribuição de perfis" });
+    ErrorHandle(error);
   }
 }
 
@@ -74,8 +73,7 @@ async function getCoursesAcquired(req, res) {
 
     res.json(result);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Erro ao buscar cursos adquiridos" });
+    ErrorHandle(error);
   }
 }
 
@@ -88,8 +86,7 @@ async function getActivities(req, res) {
     });
     res.json({ activities });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Erro interno do servidor" });
+    ErrorHandle(error);
   }
 }
 
