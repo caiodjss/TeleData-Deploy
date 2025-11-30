@@ -24,7 +24,6 @@ backend/
 
 ### Instalação
 ```bash
-cd backend
 npm install
 ```
 
