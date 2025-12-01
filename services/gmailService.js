@@ -1,11 +1,11 @@
 // gmailService.js
 const { google } = require("googleapis");
 
-const CLIENT_ID = process.env.GMAIL_CLIENT_ID;
-const CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GMAIL_REDIRECT_URI; // do OAuth Playground ou app
-const REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
-const SENDER_EMAIL = process.env.GMAIL_SENDER;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
+const SENDER_EMAIL = process.env.EMAIL_SENDER;
 
 const oAuth2Client = new google.auth.OAuth2(
   CLIENT_ID,

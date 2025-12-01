@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { Op } = require("sequelize");
 const User = require("../database/models/user");
 const config = require("../config/config");
-const { sendEmail } = require("../services/gmailService"); // 🔥 usando Gmail API
+const { sendActivationEmail, sendResetPasswordEmail } = require("../util/mailer");
 
 // Ativação de conta
 exports.activateAccount = async (req, res) => {
@@ -34,7 +34,7 @@ exports.activateAccount = async (req, res) => {
   }
 };
 
-// Login com e-mail e senha
+// Login com email e senha
 exports.login = async (req, res) => {
   try {
     const { email, password, rememberMe } = req.body;
@@ -46,10 +46,13 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) return res.status(401).json({ message: "Credenciais inválidas." });
 
+    if (!user.is_active) {
+      return res.status(403).json({ message: "Conta não ativada. Verifique seu e-mail." });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) return res.status(401).json({ message: "Credenciais inválidas." });
 
-    // Se login por e-mail estiver habilitado → envia código temporário
     if (user.two_factor_email_enabled) {
       const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
       const expires = new Date(Date.now() + 10 * 60 * 1000);
@@ -58,17 +61,11 @@ exports.login = async (req, res) => {
       user.two_factor_expires = expires;
       await user.save();
 
-      // Envia usando Gmail API HTTPS
-      await sendEmail({
-        to: email,
-        subject: "Código de confirmação de login - TeleData",
-        html: `
-          <p>Olá ${user.full_name},</p>
-          <p>Seu código de confirmação de login é:</p>
-          <h2>${code}</h2>
-          <p>O código expira em 10 minutos.</p>
-        `,
-      });
+      try {
+        await sendActivationEmail(email, code);
+      } catch (err) {
+        console.error("Erro ao enviar e-mail 2FA:", err);
+      }
 
       return res.status(200).json({
         message: "Código enviado para o e-mail.",
@@ -76,7 +73,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Caso não use verificação por e-mail → login direto
     const accessToken = jwt.sign(
       { user_id: user.user_id, email: user.email, user_type: user.user_type },
       process.env.JWT_SECRET,
@@ -86,7 +82,7 @@ exports.login = async (req, res) => {
     let refreshToken;
     if (rememberMe) {
       refreshToken = jwt.sign(
-        { user_id: user.user_id, email: user.email, user_type: user.user_type },
+        { user_id: user.user_id, email: user.email },
         process.env.JWT_REFRESH_SECRET,
         { expiresIn: "7d" }
       );
@@ -105,7 +101,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// Verificação do login por e-mail (código temporário)
+// Verificação do login por e-mail
 exports.verifyLoginEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -144,45 +140,12 @@ exports.verifyLoginEmail = async (req, res) => {
   }
 };
 
-// Ativar verificação por e-mail
-exports.enableEmail2FA = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.user_id);
-    if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
-
-    user.two_factor_email_enabled = true;
-    await user.save();
-
-    res.json({ message: "Verificação por e-mail ativada com sucesso!" });
-  } catch (err) {
-    console.error("Erro ao ativar verificação por e-mail:", err);
-    res.status(500).json({ message: "Erro interno no servidor." });
-  }
-};
-
-// Desativar verificação por e-mail
-exports.disableEmail2FA = async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.user_id);
-    if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
-
-    user.two_factor_email_enabled = false;
-    user.two_factor_code = null;
-    user.two_factor_expires = null;
-    await user.save();
-
-    res.json({ message: "Verificação por e-mail desativada com sucesso!" });
-  } catch (err) {
-    console.error("Erro ao desativar verificação por e-mail:", err);
-    res.status(500).json({ message: "Erro interno no servidor." });
-  }
-};
-
-// Refresh token
+// Refresh Token
 exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    if (!refreshToken) return res.status(400).json({ message: "Refresh token é obrigatório." });
+    if (!refreshToken)
+      return res.status(400).json({ message: "Refresh token é obrigatório." });
 
     const user = await User.findOne({ where: { refresh_token: refreshToken } });
     if (!user) return res.status(401).json({ message: "Refresh token inválido." });
@@ -222,16 +185,7 @@ exports.forgotPassword = async (req, res) => {
 
     const resetLink = `${process.env.FRONTEND_URL}/auth/reset-password/${token}`;
 
-    await sendEmail({
-      to: email,
-      subject: "Recuperação de senha - TeleData",
-      html: `
-        <p>Você solicitou redefinição de senha.</p>
-        <p>Clique no link abaixo:</p>
-        <a href="${resetLink}">${resetLink}</a>
-        <p>O link expira em 1 hora.</p>
-      `,
-    });
+    await sendResetPasswordEmail(email, resetLink);
 
     res.json({ message: "Link de recuperação enviado para o seu e-mail." });
   } catch (err) {
@@ -270,10 +224,12 @@ exports.resetPassword = async (req, res) => {
 };
 
 // Login com Google
-exports.googleCallback = (req, res) => {
+exports.googleCallback = async (req, res) => {
   try {
+    const user = req.user;
+
     const jwtToken = jwt.sign(
-      { user_id: req.user.user_id, email: req.user.email },
+      { user_id: user.user_id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
