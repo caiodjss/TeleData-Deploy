@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const { Op } = require("sequelize");
 const User = require("../database/models/user");
 const config = require("../config/config");
-const { sendActivationEmail, sendResetPasswordEmail } = require("../util/mailer");
+const { sendActivationEmail, sendResetPasswordEmail } = require("../utils/mailer");
 
 // Ativação de conta
 exports.activateAccount = async (req, res) => {
