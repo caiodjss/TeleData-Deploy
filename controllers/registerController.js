@@ -38,7 +38,10 @@ exports.registerUser = async (req, res) => {
       activation_token_expires: activationExpires,
     });
 
-    const activationLink = `${process.env.FRONTEND_URL}/auth/activate/${activationToken}`;
+    // 🔹 Base URL do frontend ou fallback
+    const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "http://localhost:3000";
+    const activationLink = `${baseUrl}/auth/activate/${activationToken}`;
+
     await sendActivationEmail(email, activationLink);
 
     return res.status(201).json({

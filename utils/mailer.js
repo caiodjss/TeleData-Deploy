@@ -5,9 +5,11 @@ const { sendEmail } = require("../services/gmailService");
 async function sendActivationEmail(email, linkOrCode) {
   const isCode = /^[0-9]{6}$/.test(linkOrCode);
 
-  const html = isCode
-    ? `<p>Seu código de verificação é:</p><h2>${linkOrCode}</h2><p>O código expira em 10 minutos.</p>`
-    : `<p>Olá!<br>Clique para ativar sua conta:</p><a href="${linkOrCode}">${linkOrCode}</a>`;
+ const html = isCode
+  ? `<p>Seu código de verificação é:</p><h2>${linkOrCode}</h2><p>O código expira em 10 minutos.</p>`
+  : `<p>Olá!<br>Clique abaixo para ativar sua conta:</p>
+     <p><a href="${linkOrCode}" target="_blank">${linkOrCode}</a></p>
+     <p>Se não foi você, ignore este email.</p>`;
 
   return sendEmail({
     to: email,
