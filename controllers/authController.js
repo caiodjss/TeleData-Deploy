@@ -1,10 +1,10 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const { Op } = require("sequelize");
 const User = require("../database/models/user");
 const config = require("../config/config");
+const { sendEmail } = require("../services/gmailService"); // 🔥 usando Gmail API
 
 // Ativação de conta
 exports.activateAccount = async (req, res) => {
@@ -51,24 +51,15 @@ exports.login = async (req, res) => {
 
     // Se login por e-mail estiver habilitado → envia código temporário
     if (user.two_factor_email_enabled) {
-      const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0"); // sempre 6 dígitos
-      const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutos
+      const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+      const expires = new Date(Date.now() + 10 * 60 * 1000);
 
       user.two_factor_code = code;
       user.two_factor_expires = expires;
       await user.save();
 
-      // Envia o código por e-mail
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: config.email.user,
-          pass: config.email.pass,
-        },
-      });
-
-      await transporter.sendMail({
-        from: config.email.user,
+      // Envia usando Gmail API HTTPS
+      await sendEmail({
         to: email,
         subject: "Código de confirmação de login - TeleData",
         html: `
@@ -136,14 +127,12 @@ exports.verifyLoginEmail = async (req, res) => {
       return res.status(400).json({ message: "Código incorreto." });
     }
 
-    // Gera JWT final
     const token = jwt.sign(
       { user_id: user.user_id, email: user.email, user_type: user.user_type },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
-    // Limpa código e expiração
     user.two_factor_code = null;
     user.two_factor_expires = null;
     await user.save();
@@ -155,9 +144,7 @@ exports.verifyLoginEmail = async (req, res) => {
   }
 };
 
-// ----------------------
-// Ativar / desativar verificação por e-mail
-// ----------------------
+// Ativar verificação por e-mail
 exports.enableEmail2FA = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.user_id);
@@ -173,6 +160,7 @@ exports.enableEmail2FA = async (req, res) => {
   }
 };
 
+// Desativar verificação por e-mail
 exports.disableEmail2FA = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.user_id);
@@ -190,9 +178,7 @@ exports.disableEmail2FA = async (req, res) => {
   }
 };
 
-// ----------------------
 // Refresh token
-// ----------------------
 exports.refreshToken = async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -218,9 +204,7 @@ exports.refreshToken = async (req, res) => {
   }
 };
 
-// ----------------------
-// Reset de senha
-// ----------------------
+// Recuperação de senha
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -230,27 +214,23 @@ exports.forgotPassword = async (req, res) => {
     if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
 
     const token = crypto.randomBytes(32).toString("hex");
-    const expires = new Date(Date.now() + 3600000); // 1 hora
+    const expires = new Date(Date.now() + 3600000);
 
     user.reset_password_token = token;
     user.reset_password_expires = expires;
     await user.save();
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: config.email.user, pass: config.email.pass },
-    });
+    const resetLink = `${process.env.FRONTEND_URL}/auth/reset-password/${token}`;
 
-    const resetLink = `http://localhost:3001/auth/reset-password/${token}`;
-    console.log("Link de recuperação:", resetLink);
-
-    await transporter.sendMail({
-      from: config.email.user,
+    await sendEmail({
       to: email,
       subject: "Recuperação de senha - TeleData",
-      html: `<p>Você solicitou redefinição de senha. Clique no link abaixo:</p>
-             <a href="${resetLink}">${resetLink}</a>
-             <p>O link expira em 1 hora.</p>`,
+      html: `
+        <p>Você solicitou redefinição de senha.</p>
+        <p>Clique no link abaixo:</p>
+        <a href="${resetLink}">${resetLink}</a>
+        <p>O link expira em 1 hora.</p>
+      `,
     });
 
     res.json({ message: "Link de recuperação enviado para o seu e-mail." });
@@ -260,6 +240,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
+// Reset de senha
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
@@ -288,9 +269,7 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// ----------------------
-// Callback do login com Google
-// ----------------------
+// Login com Google
 exports.googleCallback = (req, res) => {
   try {
     const jwtToken = jwt.sign(
