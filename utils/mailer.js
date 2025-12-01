@@ -73,4 +73,4 @@ async function sendResetPasswordEmail(email, link) {
   );
 }
 
-module.exports = { sendActivationEmail, sendResetPasswordEmail };
+module.exports = { sendEmail, sendActivationEmail, sendResetPasswordEmail };

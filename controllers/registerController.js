@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const { Sequelize } = require("sequelize");
 const User = require("../database/models/user");
-const { sendActivationEmail } = require("../services/gmailService");
+const { sendActivationEmail } = require("../utils/mailer");
 
 exports.registerUser = async (req, res) => {
   try {
