@@ -2,9 +2,7 @@ const bcrypt = require("bcrypt");
 const User = require("../database/models/user");
 const { Op } = require("sequelize");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 const config = require("../config/config");
-
 
 const editableFields = [
   "full_name",
@@ -42,66 +40,47 @@ module.exports = {
         activation_token_expires: activationExpires
       });
 
-      const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: config.email.user,
-          pass: config.email.pass,
-        },
+      // ❌ REMOVIDO O ENVIO DE E-MAIL (SMTP)
+
+      res.status(201).json({
+        message: "Usuário adicionado com sucesso",
+        user: newUser,
+        activationToken // útil para API-based email
       });
-
-      const activationLink = `http://localhost:3001/auth/activate/${activationToken}`;
-
-      await transporter.sendMail({
-        from: config.email.user,
-        to: email,
-        subject: "Ative sua conta TeleData",
-        html: `
-          <p>Olá ${name}, bem-vindo ao TeleData!</p>
-          <p>Você foi cadastrado como ${user_type}
-          <p>Clique no link abaixo para ativar sua conta:</p>
-          <a href="${activationLink}">${activationLink}</a>
-          <p>O link expira em 24 horas.</p>
-        `,
-      });
-
-      res.status(201).json({ message: "Usuário adicionado com sucesso", user: newUser });
     } catch (err) {
       console.error("Erro ao adicionar usuário (admin):", err);
       res.status(500).json({ message: "Erro interno do servidor" });
     }
   },
 
-async adminEditUser(req, res) {
-  try {
-    const { email, password, ...updates } = req.body;
+  async adminEditUser(req, res) {
+    try {
+      const { email, password, ...updates } = req.body;
 
-    if (!email)
-      return res.status(400).json({ message: "E-mail é obrigatório para atualização" });
+      if (!email)
+        return res.status(400).json({ message: "E-mail é obrigatório para atualização" });
 
-    const user = await User.findOne({ where: { email } });
+      const user = await User.findOne({ where: { email } });
+      if (!user)
+        return res.status(404).json({ message: "Usuário não encontrado" });
 
-    if (!user)
-      return res.status(404).json({ message: "Usuário não encontrado" });
-
-    if (password) {
-      updates.password_hash = await bcrypt.hash(password, 12);
-    }
-
-    for (const key in updates) {
-      if (editableFields.includes(key)) {
-        user[key] = updates[key];
+      if (password) {
+        updates.password_hash = await bcrypt.hash(password, 12);
       }
+
+      for (const key in updates) {
+        if (editableFields.includes(key)) {
+          user[key] = updates[key];
+        }
+      }
+
+      await user.save();
+      res.json({ message: "Usuário atualizado com sucesso (admin)", user });
+    } catch (err) {
+      console.error("Erro ao editar usuário (admin):", err);
+      res.status(500).json({ message: "Erro interno do servidor" });
     }
-
-    await user.save();
-
-    res.json({ message: "Usuário atualizado com sucesso (admin)", user });
-  } catch (err) {
-    console.error("Erro ao editar usuário (admin):", err);
-    res.status(500).json({ message: "Erro interno do servidor" });
-  }
-},
+  },
 
   async adminDeleteUser(req, res) {
     try {
@@ -124,7 +103,7 @@ async adminEditUser(req, res) {
 
   async adminListUsers(req, res) {
     try {
-      const { user_type, status } = req.body || {}; // filtros opcionais
+      const { user_type, status } = req.body || {};
       const where = {};
       if (user_type) where.user_type = user_type;
       if (status === "active") where.deleted_at = null;
@@ -138,7 +117,7 @@ async adminEditUser(req, res) {
     }
   },
 
-
+  // INSTRUCTOR
   async instructorEditAccount(req, res) {
     try {
       const { email } = req.user;
@@ -208,22 +187,17 @@ async adminEditUser(req, res) {
 
   async studentDeleteAccount(req, res) {
     try {
-      const { email } = req.params;
-  
-      if (email) {
-        return res.status(400).json({ message: "ID do usuário é obrigatório." });
-      }
-  
-      const user = await User.findByPk(id);
-      if (!user) {
+      const userId = req.params.id;
+      const user = await User.findByPk(userId);
+
+      if (!user)
         return res.status(404).json({ message: "Usuário não encontrado." });
-      }
-  
+
       await User.update(
         { deleted_at: new Date() },
-        { where: { user_id: email } }
+        { where: { user_id: userId } }
       );
-  
+
       res.json({ message: "Conta excluída (soft delete) com sucesso (estudante)" });
     } catch (err) {
       console.error("Erro ao excluir conta (estudante):", err);

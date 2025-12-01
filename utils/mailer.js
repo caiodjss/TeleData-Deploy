@@ -1,76 +1,32 @@
-const nodemailer = require("nodemailer");
-const { google } = require("googleapis");
-
-const OAuth2 = google.auth.OAuth2;
-
-const oauth2Client = new OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
-
-oauth2Client.setCredentials({
-  refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-});
-
-async function sendEmail(to, subject, html) {
-  try {
-    const accessToken = await oauth2Client.getAccessToken();
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        type: "OAuth2",
-        user: process.env.EMAIL_USER,
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-        accessToken: accessToken,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER, // Evita erro de domínio
-      to,
-      subject,
-      html,
-      charset: "UTF-8",
-    };
-
-    const result = await transporter.sendMail(mailOptions);
-    console.log(`✔️ E-mail enviado para ${to}`);
-    return result;
-  } catch (error) {
-    console.error("❌ Erro ao enviar e-mail:", error.message);
-    throw error;
-  }
-}
+// utils/mailer.js
+const { sendEmail } = require("../services/gmailService");
 
 // E-mail de ativação
-async function sendActivationEmail(email, link) {
-  return sendEmail(
-    email,
-    "Ative sua conta TeleData",
-    `
-      <p>Olá!</p>
-      <p>Clique abaixo para ativar sua conta:</p>
-      <a href="${link}">${link}</a>
-      <p>Este link expira em 24 horas.</p>
-    `
-  );
+async function sendActivationEmail(email, linkOrCode) {
+  const isCode = /^[0-9]{6}$/.test(linkOrCode);
+
+  const html = isCode
+    ? `<p>Seu código de verificação é:</p><h2>${linkOrCode}</h2><p>O código expira em 10 minutos.</p>`
+    : `<p>Olá!<br>Clique para ativar sua conta:</p><a href="${linkOrCode}">${linkOrCode}</a>`;
+
+  return sendEmail({
+    to: email,
+    subject: isCode ? "Seu código de confirmação" : "Ative sua conta TeleData",
+    html,
+  });
 }
 
 // E-mail de redefinição de senha
 async function sendResetPasswordEmail(email, link) {
-  return sendEmail(
-    email,
-    "Redefinição de senha - TeleData",
-    `
+  return sendEmail({
+    to: email,
+    subject: "Redefinição de senha - TeleData",
+    html: `
       <p>Você solicitou a redefinição de senha.</p>
       <p>Clique abaixo para redefinir:</p>
       <a href="${link}">${link}</a>
-    `
-  );
+    `,
+  });
 }
 
-module.exports = { sendEmail, sendActivationEmail, sendResetPasswordEmail };
+module.exports = { sendActivationEmail, sendResetPasswordEmail };
