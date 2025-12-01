@@ -243,3 +243,37 @@ exports.googleCallback = async (req, res) => {
     res.status(500).json({ message: "Erro interno no servidor." });
   }
 };
+
+// Habilitar 2FA por e-mail
+exports.enableEmail2FA = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.user_id);
+    if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
+
+    user.two_factor_email_enabled = true;
+    await user.save();
+
+    res.json({ message: "2FA por e-mail habilitado com sucesso." });
+  } catch (err) {
+    console.error("Erro ao habilitar 2FA:", err);
+    res.status(500).json({ message: "Erro interno no servidor." });
+  }
+};
+
+// Desabilitar 2FA por e-mail
+exports.disableEmail2FA = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.user_id);
+    if (!user) return res.status(404).json({ message: "Usuário não encontrado." });
+
+    user.two_factor_email_enabled = false;
+    user.two_factor_code = null;
+    user.two_factor_expires = null;
+    await user.save();
+
+    res.json({ message: "2FA por e-mail desabilitado com sucesso." });
+  } catch (err) {
+    console.error("Erro ao desabilitar 2FA:", err);
+    res.status(500).json({ message: "Erro interno no servidor." });
+  }
+};
