@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const connection = require("./database/connection");
+const cors = require("cors");
 const passport = require("passport"); 
 
 // Inicialização do app
@@ -36,6 +37,10 @@ const paymentRoutes = require("./routes/paymentRoutes");
 connection.sync({ alter: true })
   .then(() => console.log("Banco sincronizado"))
   .catch(console.error);
+
+
+app.use(cors({origin: "*"}));
+
 
 // Usando rotas
 app.use("/home", home);
