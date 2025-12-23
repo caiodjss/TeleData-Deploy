@@ -39,7 +39,7 @@ exports.registerUser = async (req, res) => {
     });
 
     // 🔹 Base URL do frontend ou fallback
-    const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "http://localhost:3000";
+    const baseUrl = process.env.APP_URL || process.env.FRONTEND_URL || "http://plusintel.up.railway.app/";
     const activationLink = `${baseUrl}/auth/activate/${activationToken}`;
 
     await sendActivationEmail(email, activationLink);
