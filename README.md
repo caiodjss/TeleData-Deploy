@@ -719,5 +719,3 @@ Authorization: Bearer <token_jwt>
 1. Usar refresh token em POST `/auth/refresh-token`
 2. Receber novo access token
 3. Continuar usando novas requisições
-
-Esta documentação cobre todas as funcionalidades implementadas no backend. Para dúvidas específicas sobre alguma rota ou funcionalidade, consulte os controladores correspondentes.
